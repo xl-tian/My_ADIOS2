@@ -48,6 +48,7 @@ CMakeSettings.json
 # CMake generated files
 build/
 build.*/
+build*/
 .idea/
 
 # redis dump files
