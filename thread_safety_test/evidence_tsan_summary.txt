@@ -1,0 +1,40 @@
+ThreadSanitizer evidence — ADIOS2 concurrent Engine::Put (BP5, 8 threads)
+Library + test built with -fsanitize=thread (gcc 13.3).
+Run: ./concurrent_put_test --concurrent --threads 8 --vars 4 --elems 4096 --iters 20
+
+Total data-race reports in one run: 58
+Process outcome: ABORTED by glibc fortify check -> '*** buffer overflow detected ***'
+(a corrupted shared offset produced a real out-of-bounds write)
+
+Distinct ADIOS2 race sites (file:line in adios2 source, dedup'd):
+      5 source/adios2/toolkit/format/buffer/chunk/ChunkV.cpp:107 in adios2::format::ChunkV::AddToVec
+      3 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:108 in adios2::format::BP5Serializer::RecalcMarshalStorageSize
+      2 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:837 in adios2::format::BP5Serializer::Marshal
+      2 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:149 in adios2::format::BP5Serializer::AddSimpleField
+      2 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:140 in adios2::format::BP5Serializer::AddSimpleField
+      2 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:139 in adios2::format::BP5Serializer::AddSimpleField
+      2 source/adios2/toolkit/format/bp5/BP5Base.cpp:46 in adios2::format::BP5Base::BP5BitfieldTest
+      1 source/adios2/toolkit/format/buffer/chunk/ChunkV.cpp:106 in adios2::format::ChunkV::AddToVec
+      1 source/adios2/toolkit/format/buffer/BufferV.cpp:36 in adios2::format::BufferV::AlignBuffer
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:883 in adios2::format::BP5Serializer::Marshal
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:878 in adios2::format::BP5Serializer::Marshal
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:818 in adios2::format::BP5Serializer::Marshal
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:654 in adios2::format::BP5Serializer::CreateWriterRec
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:644 in adios2::format::BP5Serializer::CreateWriterRec
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:583 in adios2::format::BP5Serializer::CreateWriterRec
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:521 in adios2::format::BP5Serializer::CreateWriterRec
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:154 in adios2::format::BP5Serializer::AddSimpleField
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:138 in adios2::format::BP5Serializer::AddSimpleField
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:135 in adios2::format::BP5Serializer::AddSimpleField
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:110 in adios2::format::BP5Serializer::RecalcMarshalStorageSize
+      1 source/adios2/toolkit/format/bp5/BP5Serializer.cpp:109 in adios2::format::BP5Serializer::RecalcMarshalStorageSize
+      1 source/adios2/toolkit/format/bp5/BP5Base.cpp:42 in adios2::format::BP5Base::BP5BitfieldTest
+      1 source/adios2/toolkit/format/bp5/BP5Base.cpp:35 in adios2::format::BP5Base::BP5BitfieldSet
+
+All races are reached from the user Put() call. Representative stack:
+  adios2::Engine::Put<int>
+   -> adios2::core::Engine::Put<int>
+   -> BP5Writer::DoPutSync            (BP5Writer.cpp:2743)
+   -> BP5Writer::PutCommon           (BP5Writer.cpp:2712)
+   -> BP5Serializer::Marshal         (BP5Serializer.cpp:837  m_GetMinMaxSecs +=)
+  racing on the heap block allocated by IO::MakeEngine<BP5Writer> (the one shared engine).
