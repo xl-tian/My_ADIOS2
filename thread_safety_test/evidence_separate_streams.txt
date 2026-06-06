@@ -1,0 +1,22 @@
+Separate IO + Engine + stream per thread — ThreadSanitizer evidence
+One shared adios2::ADIOS factory, 8 threads, BP5, each thread its own file.
+
+[create-upfront]  main thread declares/opens/closes; only Put/EndStep concurrent
+  read-back verification : PASS (every separate stream correct)
+  TSan data races        : 1
+  race site              : thirdparty/ffs/ffs/fm/fm_formats.c:211 get_format_server_verbose
+    via BP5Serializer::CloseTimestep -> FFS self_server_register_format (global format registry)
+
+[create-in-thread]  each thread also DeclareIO/Open/Close concurrently
+  read-back verification : PASS (data happened to survive this run)
+  TSan data races        : 13
+  race sites:
+    - source/adios2/core/ADIOS.cpp:193,212  ADIOS::DeclareIO -> shared m_IOs std::map (find/emplace)
+    - thirdparty/ffs/ffs/fm/fm_formats.c:211 get_format_server_verbose (FFS global registry)
+
+Conclusion: separate engines remove the catastrophic shared-serializer races
+(no corruption/crash like the single-engine case), but it is NOT fully race-free:
+ * the shared ADIOS factory's DeclareIO/Open mutate a lockless map, and
+ * BP5 sits on FFS, whose format registration touches process-global state at EndStep.
+Make it safe: create/open/close all engines from one thread (or under a lock) and
+only parallelize the Put loop; or, best, one ADIOS per process (MPI ranks).

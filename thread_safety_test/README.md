@@ -106,3 +106,44 @@ The claim holds. If you write from multiple threads, give each thread its own
 `IO`+`Engine` (separate output), or serialize all `Put`/`BeginStep`/`EndStep`/
 `Close` calls on a shared engine behind your own lock — exactly as the ADIOS2
 docs advise.
+
+## Follow-up: a separate IO + Engine + stream per thread (`separate_engine_test.cpp`)
+
+A natural fix is: give every thread its own `IO`, its own `Engine`, and its own
+output file, so no serializer/buffer is shared. **Does that work?**
+
+**Mostly yes — it removes the catastrophic races — but it is still not fully
+thread-safe with one shared `adios2::ADIOS` factory.** Measured here (TSan, 8
+threads, BP5):
+
+* `--create-upfront` (main thread declares/opens/closes everything; only the
+  `Put`/`EndStep` loop is concurrent): read-back **PASS**, but **1** TSan race
+  remains — `BP5Serializer::CloseTimestep → FFS self_server_register_format`
+  touches a **process-global** format registry
+  (`thirdparty/ffs/ffs/fm/fm_formats.c:211`). BP5 is built on FFS, which keeps
+  global state.
+* `--create-in-thread` (each thread also calls `DeclareIO`/`Open`/`Close`):
+  read-back PASS this run, but **13** TSan races — the shared `ADIOS::DeclareIO`
+  mutates its `m_IOs` `std::map` with no lock (`source/adios2/core/ADIOS.cpp:193,212`),
+  plus the same FFS global.
+
+So separate engines eliminate the data-corruption/crash seen with a shared
+engine (each engine has its own buffer), but two shared things remain:
+
+1. the **`ADIOS` factory** — `DeclareIO`/`Open`/`RemoveIO` mutate a lockless map;
+2. **FFS global state** — format registration during `EndStep`/`Close`.
+
+**To make it actually safe:** create, open, and close all engines from a single
+thread (or under a lock) and only parallelize the `Put` loop — and even then
+expect a residual FFS-registration race at `EndStep` unless that too is
+serialized. The cleanly supported model is **one `ADIOS` per process** (e.g. MPI
+ranks), which is what ADIOS2 is designed and tested for.
+
+Run it:
+
+```bash
+./separate_engine_test --create-upfront  --threads 8
+./separate_engine_test --create-in-thread --threads 8
+```
+
+See `evidence_separate_streams.txt` for the captured numbers.
