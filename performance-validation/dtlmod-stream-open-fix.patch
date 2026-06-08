@@ -1,0 +1,71 @@
+From 18ea9c7741abd6453eb065a1f1fa27cf1440c8a5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 8 Jun 2026 08:41:09 +0000
+Subject: [PATCH] Fix null-deref crash when opening File streams with multiple
+ pub+sub actors
+
+Stream::open created the Engine under the DTL mutex (create_engine_if_needed)
+but registered the actor outside it (register_actor_with_engine). With several
+publishers and several subscribers sharing a File stream, a concurrent actor
+closing the stream could reset engine_ to nullptr in that gap, so the next
+opener dereferenced a null Engine in Engine::add_subscriber (SIGSEGV).
+
+Make engine creation and actor registration a single critical section by
+holding dtl_->mutex_ across both, and operate on a captured shared_ptr so the
+returned engine is stable. This is the previously untested
+multiple-publisher / multiple-subscriber File configuration; the change takes
+it from ~100% crashes to none and leaves the unit-test suite unchanged.
+
+https://claude.ai/code/session_01XA181vRyzuZKkDXPM85Efv
+---
+ src/Stream.cpp | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/src/Stream.cpp b/src/Stream.cpp
+index 12b371b..0ee25be 100644
+--- a/src/Stream.cpp
++++ b/src/Stream.cpp
+@@ -227,11 +227,13 @@ void Stream::validate_open_parameters(std::string_view name, Mode mode) const
+ }
+ 
+ /// Create the Engine if this is the first actor opening the Stream.
+-/// Executed in a critical section to ensure only one Engine is created.
++/// The caller (Stream::open) holds dtl_->mutex_ so that engine creation and the
++/// subsequent actor registration form a single critical section: otherwise a
++/// concurrent actor closing the Stream could reset engine_ to nullptr between
++/// the two steps, leading to a null dereference in register_actor_with_engine
++/// (observed in the multiple-publisher / multiple-subscriber File configuration).
+ void Stream::create_engine_if_needed(std::string_view name, Mode mode)
+ {
+-  std::scoped_lock lock(*dtl_->mutex_);
+-
+   if (not engine_) {
+     std::shared_ptr<Engine> temp_engine;
+ 
+@@ -272,12 +274,19 @@ void Stream::register_actor_with_engine(Mode mode) const
+ std::shared_ptr<Engine> Stream::open(std::string_view name, Mode mode)
+ {
+   validate_open_parameters(name, mode);
+-  create_engine_if_needed(name, mode);
+-  register_actor_with_engine(mode);
++  // Engine creation and actor registration must be atomic: hold the DTL mutex
++  // across both so engine_ cannot be torn down by another actor in between.
++  std::shared_ptr<Engine> engine;
++  {
++    std::scoped_lock lock(*dtl_->mutex_);
++    create_engine_if_needed(name, mode);
++    register_actor_with_engine(mode);
++    engine = engine_;
++  }
+   XBT_DEBUG("Stream '%s' uses engine '%s' and transport '%s' (%zu Pub. / %zu Sub.)", get_cname(),
+             get_engine_type_str().value_or("Unknown"), get_transport_method_str().value_or("Unknown"),
+-            engine_->get_publishers().count(), engine_->get_subscribers().count());
+-  return engine_;
++            engine->get_publishers().count(), engine->get_subscribers().count());
++  return engine;
+ }
+ 
+ /****** Variable Factory ******/
+-- 
+2.43.0
+
