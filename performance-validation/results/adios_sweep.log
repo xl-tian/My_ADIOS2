@@ -1,0 +1,10 @@
+### BP5 (ranks 1,2,4) ###
+### SST (ranks 1,2) ###
+### DataMan (rank 1) ###
+FAIL DataMan sz=134217728 r=1 rep=0 w=0 r=134
+tail: option used in invalid context -- 3
+FAIL DataMan sz=134217728 r=1 rep=1 w=0 r=134
+tail: option used in invalid context -- 3
+FAIL DataMan sz=134217728 r=1 rep=2 w=0 r=134
+tail: option used in invalid context -- 3
+### DONE: 285 rows ###

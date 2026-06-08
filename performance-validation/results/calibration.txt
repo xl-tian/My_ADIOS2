@@ -1,0 +1,14 @@
+ADIOS2 -> SimGrid calibration (1-rank affine fit  t = alpha + n/beta)
+
+BP5      writer: alpha=   242.6us  beta_asym=1.110 GB/s (1110.4 MB/s)    lat@1KB=   0.020ms
+BP5      reader: alpha=     3.9us  beta_asym=6.037 GB/s (6036.6 MB/s)    lat@1KB=   0.059ms
+SST      writer: alpha=     0.0us  beta_asym=0.943 GB/s (942.8 MB/s)     lat@1KB=  43.999ms
+SST      reader: alpha=     0.0us  beta_asym=0.937 GB/s (936.8 MB/s)     lat@1KB=  43.998ms
+DataMan  writer: alpha=     0.0us  beta_asym=0.621 GB/s (621.4 MB/s)     lat@1KB=   0.009ms
+DataMan  reader: alpha=     0.0us  beta_asym=0.577 GB/s (577.2 MB/s)     lat@1KB=   0.074ms
+
+Derived DTLMod platform parameters:
+  File   disk write : 1.110 GB/s (1110.4 MB/s)
+  File   disk read  : 6.037 GB/s (6036.6 MB/s)
+  SST    link bw    : 0.943 GB/s (942.8 MB/s)  lat=0.00 us
+  DataMan link bw   : 0.614 GB/s (614.3 MB/s)  lat=0.00 us

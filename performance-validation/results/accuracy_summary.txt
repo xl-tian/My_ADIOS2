@@ -1,0 +1,23 @@
+DTLMod vs ADIOS2 — accuracy by regime
+================================================================
+
+Per-step time relative error |(DTLMod - ADIOS2)/ADIOS2|, medians.
+
+engine   role   |  BW regime (>=1MB) |  latency regime (<1MB)
+----------------------------------------------------------------
+BP5      writer |        6.9% (n=15) |            89.3% (n=9)
+BP5      reader |       10.4% (n=10) |            96.3% (n=6)
+SST      writer |       53.2% (n=10) |            93.4% (n=6)
+SST      reader |       50.6% (n=10) |            93.3% (n=6)
+DataMan  writer |        23.2% (n=5) |            88.5% (n=3)
+DataMan  reader |        53.9% (n=4) |            97.8% (n=3)
+
+Latency floor at smallest message (1 KB), writer, 1 rank:
+   BP5     : ADIOS2    0.020 ms   DTLMod    0.001 ms
+   SST     : ADIOS2   43.999 ms   DTLMod    0.001 ms
+   DataMan : ADIOS2    0.009 ms   DTLMod    0.002 ms
+
+Idealized MQ staging (data movement cost), writer, 1 rank:
+      1 MB: MQ predicts    0.000 us  (real SST    1.0 ms)
+     16 MB: MQ predicts    0.000 us  (real SST   14.4 ms)
+     64 MB: MQ predicts    0.000 us  (real SST   70.8 ms)

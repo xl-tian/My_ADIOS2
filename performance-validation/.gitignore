@@ -1,0 +1,8 @@
+# compiled benchmark binaries (rebuild from source)
+adios/adios_bench
+dtlmod/dtl_bench
+*.o
+*.out
+# local python venv for plotting
+venv/
+__pycache__/
